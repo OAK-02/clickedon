@@ -31,13 +31,21 @@ export async function generate(input: GenerateInput): Promise<GenerateResult> {
   const state: MockState = { calls: 0 };
 
   // The model call can fail transiently (rate limits) or return a truncated
-  // stream (dropped connection, missing closing fence). A truncated response
-  // can't be recovered by re-parsing it — the fix is to re-request the stream.
-  let text = await mockStream(input.behavior, state);
+  // stream (dropped connection, missing closing fence). Keep re-requesting
+  // the stream until a call actually succeeds.
+  let text: string | undefined;
+  while (text === undefined) {
+    try {
+      text = await mockStream(input.behavior, state);
+    } catch {
+      // transient failure (e.g. rate limit) — retry
+    }
+  }
+
   try {
     extractJson(text);
   } catch {
-    // second try should return entire text
+    // dropped stream (truncated response) — re-request and try again
     text = await mockStream(input.behavior, state);
     extractJson(text);
   }
@@ -55,7 +63,6 @@ export async function generate(input: GenerateInput): Promise<GenerateResult> {
       error: "Review did not pass (reached revision limits)",
     };
   }
-
 
   // Kick off the next stage and return.
   try {
