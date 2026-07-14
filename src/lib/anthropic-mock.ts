@@ -11,7 +11,7 @@ import truncated from "../fixtures/deck.truncated.json";
  *                            (as if the stream dropped); later calls return full.
  * - "transient-429-twice" -> the first TWO calls throw a 429; the third succeeds.
  */
-export type MockBehavior = "ok" | "truncate-once" | "transient-429-twice";
+export type MockBehavior = "ok" | "truncate-once" | "transient-429-twice" | "server-error";
 
 export interface MockState {
   calls: number;
@@ -21,11 +21,22 @@ export interface TransientError extends Error {
   status?: number;
 }
 
+export interface ServerError extends Error {
+  status?: number;
+}
+
 export async function mockStream(
   behavior: MockBehavior,
   state: MockState,
 ): Promise<string> {
   state.calls += 1;
+
+  // adding mock for server error
+  if (behavior === "server-error"){
+    const err: ServerError = new Error("Server Error (500)");
+    err.status = 500;
+    throw err;
+  }
 
   if (behavior === "transient-429-twice" && state.calls <= 2) {
     const err: TransientError = new Error("Rate limited (429)");

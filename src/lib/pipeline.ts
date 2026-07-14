@@ -37,8 +37,16 @@ export async function generate(input: GenerateInput): Promise<GenerateResult> {
   while (text === undefined) {
     try {
       text = await mockStream(input.behavior, state);
-    } catch {
-      // transient failure (e.g. rate limit) — retry
+    } catch(err) {
+      const status = (err as { status?: number }).status;
+      if (status !== 429) {
+        return {
+          status: "error",
+          attempts: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+      // else: transient rate limit — loop and retry
     }
   }
 
