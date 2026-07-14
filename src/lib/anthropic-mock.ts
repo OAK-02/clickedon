@@ -21,20 +21,22 @@ export interface TransientError extends Error {
   status?: number;
 }
 
+const RATE_LIMIT = 2;
+
 export async function mockStream(
   behavior: MockBehavior,
   state: MockState,
 ): Promise<string> {
   state.calls += 1;
 
-  if (behavior === "transient-429-twice" && state.calls <= 2) {
+  if (behavior === "truncate-once" && state.calls === 1) {
+    return (truncated as { text: string }).text;
+  }
+
+  if (behavior === "transient-429-twice" && state.calls > RATE_LIMIT) {
     const err: TransientError = new Error("Rate limited (429)");
     err.status = 429;
     throw err;
-  }
-
-  if (behavior === "truncate-once" && state.calls === 1) {
-    return (truncated as { text: string }).text;
   }
 
   return (full as { text: string }).text;
